@@ -11,8 +11,8 @@ const optionDefinitions = [
 
 const sections = [
   {
-    header: 'piler-dev',
-    content: 'Xpiler for a Markdown- and JS-based website.'
+    header: 'magpiler-dev',
+    content: 'Xpiler for a Markdown- and JS-based website.\nRun a dev server.'
   },
   {
     header: 'Options',
@@ -20,7 +20,7 @@ const sections = [
       {
         name: 'input',
         typeLabel: '{underline folder}',
-        description: 'The input folder to process (e.g. {underline /path/to/src}).'
+        description: '(Default with no flags.) The input folder to process (e.g. {underline /path/to/src}).'
       },
       {
         name: 'help',
@@ -54,6 +54,41 @@ const getFilesRecursively = (path) => {
   return files.concat(getFiles(path));
 };
 
+function processMeta(ob) {
+  //console.log('file:', ob.file);
+  ob.lines = ob.contents.split('\n');
+  ob.meta = {}
+  if (ob.lines.length < 1) {
+    return;
+  }
+  if (ob.lines[0] == "---") {
+    let pairs = {}
+    let sepCount = 0;
+    let cleanLines = [];
+    ob.lines.forEach(line => {
+      if (line === '---') {
+        sepCount++;
+        return;
+      }
+      if (sepCount >=2 ) {
+        cleanLines.push(line);
+      } else {
+        let ix = line.indexOf(":");
+        if (ix > 0) {
+          let key = line.slice(0, ix).trim();
+          let rhs = line.slice(ix +1).trim();
+          if (rhs.startsWith('"') || rhs.startsWith("'")) {
+            rhs = JSON.parse(rhs);
+          }
+          ob.meta[key] = rhs;
+        }
+      }
+    });
+    ob.body = cleanLines.join("\n");
+  }
+  //console.log(ob.meta);
+}
+
 function getFileNames(folder, shouldGetContents) {
   let ret = [];
   getFilesRecursively(folder).forEach(fullPath => {
@@ -61,10 +96,11 @@ function getFileNames(folder, shouldGetContents) {
     if (fullPath.indexOf('/.') >= 0) { // skip .xyz files
       return;
     }
-    console.log(folder, file);
     if (shouldGetContents) {
       let c = fs.readFileSync(Path.join(folder, file)) + "";
-      ret.push({ name: file, contents: c });
+      let ob = { file: file, contents: c };
+      ret.push(ob);
+      processMeta(ob);
     } else {
       ret.push(file);
     }
@@ -84,12 +120,11 @@ function realMain(options) {
   options.src = Path.join(options.input, "src");
   options.out = Path.join(options.input, "out");
   fs.readdirSync(options.src).forEach(folder => {
-    //console.log("FOLDER:", folder);
     if ('render layouts static'.split(' ').includes(folder)) {
       options[folder] = getFileNames(Path.join(options.src, folder), folder != 'static');
     }
   });
-  console.log("OPTIONS\n---\n", options);
+  //console.log("OPTIONS\n---\n", options);
 }
 
 main();
