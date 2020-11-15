@@ -3,6 +3,7 @@ const getUsage = require('command-line-usage');
 const path = require('path');
 const Path = path;
 const fs = require('fs');
+const md = require('markdown-it')({html: true});
 
 const optionDefinitions = [
   { name: 'input', alias: 'i', defaultOption: true, type: String, description: "input folder to process"},
@@ -44,9 +45,11 @@ function main(options) {
 
 // https://stackoverflow.com/a/47492545
 const isDirectory = path => fs.statSync(path).isDirectory();
-const getDirectories = path => fs.readdirSync(path).map(name => Path.join(path, name)).filter(isDirectory);
+const getDirectories = path =>
+  fs.readdirSync(path).map(name => Path.join(path, name)).filter(isDirectory);
 const isFile = path => fs.statSync(path).isFile();  
-const getFiles = path => fs.readdirSync(path).map(name => Path.join(path, name)).filter(isFile);
+const getFiles = path =>
+  fs.readdirSync(path).map(name => Path.join(path, name)).filter(isFile);
 const getFilesRecursively = (path) => {
   let dirs = getDirectories(path);
   let files = dirs.map(dir => getFilesRecursively(dir)) // go through each directory
@@ -56,16 +59,16 @@ const getFilesRecursively = (path) => {
 
 function processMeta(ob) {
   //console.log('file:', ob.file);
-  ob.lines = ob.contents.split('\n');
+  lines = ob.contents.split('\n');
   ob.meta = {}
-  if (ob.lines.length < 1) {
+  if (lines.length < 1) {
     return;
   }
-  if (ob.lines[0] == "---") {
+  if (lines[0] == "---") {
     let pairs = {}
     let sepCount = 0;
     let cleanLines = [];
-    ob.lines.forEach(line => {
+    lines.forEach(line => {
       if (line === '---') {
         sepCount++;
         return;
@@ -77,16 +80,23 @@ function processMeta(ob) {
         if (ix > 0) {
           let key = line.slice(0, ix).trim();
           let rhs = line.slice(ix +1).trim();
-          if (rhs.startsWith('"') || rhs.startsWith("'")) {
-            rhs = JSON.parse(rhs);
-          }
+          rhs = JSON.parse(rhs);
           ob.meta[key] = rhs;
         }
       }
     });
     ob.body = cleanLines.join("\n");
+    //console.log(ob.body);
   }
   //console.log(ob.meta);
+}
+
+function processMarkdown(ob) {
+  if (ob.file.endsWith('.md')) {
+    ob.file = ob.file.replace('.md', '');
+    ob.body = md.render(ob.body);
+    //console.log("-=-=-\n", ob);
+  }
 }
 
 function getFileNames(folder, shouldGetContents) {
@@ -101,6 +111,7 @@ function getFileNames(folder, shouldGetContents) {
       let ob = { file: file, contents: c };
       ret.push(ob);
       processMeta(ob);
+      processMarkdown(ob);
     } else {
       ret.push(file);
     }
