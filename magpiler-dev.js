@@ -5,9 +5,12 @@ const Path = path;
 const fs = require('fs');
 const md = require('markdown-it')({html: true});
 const { renderToString } = require('@popeindustries/lit-html-server');
+const express = require('express');
 
+const DEFAULT_PORT = 8123;
 
 const optionDefinitions = [
+  { name: 'port', alias: 'p', type: Number, description: "port on which server will listen"},
   { name: 'input', alias: 'i', defaultOption: true, type: String, description: "input folder to process"},
   { name: 'help', alias: 'h', type: Boolean, description: "print this usage help and exit"}
 ];
@@ -157,6 +160,7 @@ function realMain(options) {
       options[folder] = getFileNames(Path.join(options.src, folder), folder != 'static');
     }
   });
+  // layouts from an array to a dict
   let layouts = {};
   options.layouts.forEach(o => {
     if (o.file.endsWith(".js")) {
@@ -164,21 +168,37 @@ function realMain(options) {
       layouts[short] = o;
     }
   });
-  let def = layouts['default'];
-  let global = { footerHTML: "<p>Test Footer text</p>" };
-  options.render.forEach(context => {
-    let layout = context.layout || 'default';
-    //console.log(context.file, layout);
-    let ret = def.templateFunc(context, global);
-    renderToString(ret).then(result => {
-      // console.log('---');
-      // console.log(context.file);
-      // //console.log(c.body);
-      // console.log(result);
-    });
-  });
-
+  options.layoutsDict = layouts;
   //console.log("OPTIONS\n---\n", options);
+  options.global = { footerHTML: "<p>Test Footer text</p>" }; // TODO get this from src/ folder or its parent
+
+  startServer(options);
+}
+
+function getPage(url, context, global) {
+  let def = context.layoutsDict['default'];
+  // options.render.forEach(context => {
+  //   let layout = context.layout || 'default';
+  //   // TODO use default layout AFTER first layout
+  //   //console.log(context.file, layout);
+  //   let ret = def.templateFunc(context, context.global);
+  //   renderToString(ret).then(result => {
+  //     // console.log('---');
+  //     // console.log(context.file);
+  //     // //console.log(c.body);
+  //     // console.log(result);
+  //   });
+  // });
+}
+
+function startServer(options) {
+  let app = express();
+  app.get('/', function (req, res) {
+    res.send('Hello World')
+  })
+  const port = options.port || DEFAULT_PORT;
+  console.log('Listening on localhost:' + port);
+  app.listen(port);
 }
 
 main();
