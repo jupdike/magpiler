@@ -4,6 +4,8 @@ const path = require('path');
 const Path = path;
 const fs = require('fs');
 const md = require('markdown-it')({html: true});
+const { renderToString } = require('@popeindustries/lit-html-server');
+
 
 const optionDefinitions = [
   { name: 'input', alias: 'i', defaultOption: true, type: String, description: "input folder to process"},
@@ -81,12 +83,12 @@ function processMeta(ob) {
           let key = line.slice(0, ix).trim();
           let rhs = line.slice(ix +1).trim();
           rhs = JSON.parse(rhs);
-          ob.meta[key] = rhs;
+          ob[key] = rhs;
         }
       }
     });
+    //console.log(ob);
     ob.body = cleanLines.join("\n");
-    //console.log(ob.body);
   }
   //console.log(ob.meta);
 }
@@ -96,6 +98,14 @@ function processMarkdown(ob) {
     ob.file = ob.file.replace('.md', '');
     ob.body = md.render(ob.body);
     //console.log("-=-=-\n", ob);
+  }
+}
+
+// all non-static .js files are considered layouts or templates
+function processLayout(ob) {
+  if (ob.file.endsWith(".js")) {
+    //console.log("-=-=-\n", ob);
+    ob.templateFunc = eval(ob.contents);
   }
 }
 
@@ -112,12 +122,24 @@ function getFileNames(folder, shouldGetContents) {
       ret.push(ob);
       processMeta(ob);
       processMarkdown(ob);
+      processLayout(ob);
     } else {
       ret.push(file);
     }
   });
   return ret;
 }
+
+// const http = require('http');
+// const { renderToStream } = require('@popeindustries/lit-html-server');
+// const port = 8123;
+// console.log("Listening on port", port);
+// http.createServer((request, response) => {
+//   const data = { title: 'Home', api: '/api/home' };
+//   response.writeHead(200);
+//   // Returns a Node.js Readable stream which can be piped to "response"
+//   renderToStream(Layout(data)).pipe(response);
+// }).listen(port);
 
 function realMain(options) {
   if (options.help) {
@@ -135,6 +157,27 @@ function realMain(options) {
       options[folder] = getFileNames(Path.join(options.src, folder), folder != 'static');
     }
   });
+  let layouts = {};
+  options.layouts.forEach(o => {
+    if (o.file.endsWith(".js")) {
+      let short = o.file.replace('.js', '');
+      layouts[short] = o;
+    }
+  });
+  let def = layouts['default'];
+  let global = { footerHTML: "<p>Test Footer text</p>" };
+  options.render.forEach(context => {
+    let layout = context.layout || 'default';
+    //console.log(context.file, layout);
+    let ret = def.templateFunc(context, global);
+    renderToString(ret).then(result => {
+      // console.log('---');
+      // console.log(context.file);
+      // //console.log(c.body);
+      // console.log(result);
+    });
+  });
+
   //console.log("OPTIONS\n---\n", options);
 }
 
