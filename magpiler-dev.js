@@ -1,10 +1,12 @@
 const commandLineArgs = require('command-line-args');
 const getUsage = require('command-line-usage');
+const md = require('markdown-it')({html: true});
+
 const path = require('path');
 const Path = path;
 const fs = require('fs');
-const md = require('markdown-it')({html: true});
-const { renderToString } = require('@popeindustries/lit-html-server');
+
+const { renderToString, renderToStream } = require('@popeindustries/lit-html-server');
 const express = require('express');
 
 const DEFAULT_PORT = 8123;
@@ -92,6 +94,8 @@ function processMeta(ob) {
     });
     //console.log(ob);
     ob.body = cleanLines.join("\n");
+  } else {
+    ob.body = ob.contents;
   }
   //console.log(ob.meta);
 }
@@ -160,7 +164,8 @@ function realMain(options) {
       options[folder] = getFileNames(Path.join(options.src, folder), folder != 'static');
     }
   });
-  // layouts from an array to a dict
+  
+  // /layouts/ from an array to a dict
   let layouts = {};
   options.layouts.forEach(o => {
     if (o.file.endsWith(".js")) {
@@ -169,32 +174,45 @@ function realMain(options) {
     }
   });
   options.layoutsDict = layouts;
+
+  // /render/ items from an array to a dict
+  options.renderDict = [];
+  options.render.forEach(o => {
+    options.renderDict[o.file] = o;
+  });
+
   //console.log("OPTIONS\n---\n", options);
   options.global = { footerHTML: "<p>Test Footer text</p>" }; // TODO get this from src/ folder or its parent
 
   startServer(options);
 }
 
-function getPage(url, context, global) {
-  let def = context.layoutsDict['default'];
-  // options.render.forEach(context => {
-  //   let layout = context.layout || 'default';
-  //   // TODO use default layout AFTER first layout
-  //   //console.log(context.file, layout);
-  //   let ret = def.templateFunc(context, context.global);
-  //   renderToString(ret).then(result => {
-  //     // console.log('---');
-  //     // console.log(context.file);
-  //     // //console.log(c.body);
-  //     // console.log(result);
-  //   });
+function getPage(url, req, response, options, global) {
+  let def = options.layoutsDict['default'];
+  // TODO use default layout AFTER first layout
+
+  //console.log(context.file, layout);
+  let context = options.renderDict[url];
+  let layout = context.layout || 'default';
+  layout = options.layoutsDict[layout];
+  
+  let ret = layout.templateFunc(context, global);
+  // renderToString(ret).then(result => {
+  //   // console.log('---');
+  //   // console.log(context.file);
+  //   // //console.log(c.body);
+  //   // console.log(result);
   // });
+  renderToStream(ret).pipe(response);
 }
+
+// TODO deal with /static/
 
 function startServer(options) {
   let app = express();
   app.get('/', function (req, res) {
-    res.send('Hello World')
+    //res.send('Hello World');
+    getPage('index.html', req, res, options, options.global);
   })
   const port = options.port || DEFAULT_PORT;
   console.log('Listening on localhost:' + port);
