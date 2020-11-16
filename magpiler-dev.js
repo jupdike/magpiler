@@ -13,7 +13,7 @@ const serveStatic = require('serve-static')
 const DEFAULT_PORT = 8123;
 
 const optionDefinitions = [
-  { name: 'port', alias: 'p', type: Number, description: "port on which server will listen"},
+  { name: 'port', alias: 'p', type: Number, description: "port on which server will listen (default "+DEFAULT_PORT+")"},
   { name: 'input', alias: 'i', defaultOption: true, type: String, description: "input folder to process"},
   { name: 'help', alias: 'h', type: Boolean, description: "print this usage help and exit"}
 ];
@@ -30,6 +30,11 @@ const sections = [
         name: 'input',
         typeLabel: '{underline folder}',
         description: '(Default with no flags.) The input folder to process (e.g. {underline /path/to/src}).'
+      },
+      {
+        name: 'port',
+        typeLabel: '{underline number}',
+        description: "port on which server will listen (default "+DEFAULT_PORT+")"
       },
       {
         name: 'help',
@@ -131,23 +136,13 @@ function getFileNames(folder, shouldGetContents) {
       processMeta(ob);
       processMarkdown(ob);
       processLayout(ob);
+      //console.log(ob.file);
     } else {
       ret.push(file);
     }
   });
   return ret;
 }
-
-// const http = require('http');
-// const { renderToStream } = require('@popeindustries/lit-html-server');
-// const port = 8123;
-// console.log("Listening on port", port);
-// http.createServer((request, response) => {
-//   const data = { title: 'Home', api: '/api/home' };
-//   response.writeHead(200);
-//   // Returns a Node.js Readable stream which can be piped to "response"
-//   renderToStream(Layout(data)).pipe(response);
-// }).listen(port);
 
 function realMain(options) {
   if (options.help) {
@@ -189,12 +184,18 @@ function realMain(options) {
 }
 
 function getPage(url, req, response, options, global) {
+  if (url.startsWith('/')) {
+    url = url.slice(1);
+  }
   let def = options.layoutsDict['default'];
   // TODO use default layout AFTER first layout
 
   //console.log(context.file, layout);
   let context = options.renderDict[url];
-  let layout = context.layout || 'default';
+  let layout = 'default';
+  if (context && context.layout) {
+    layout = context.layout;
+  }
   layout = options.layoutsDict[layout];
   
   let ret = layout.templateFunc(context, global);
@@ -207,6 +208,13 @@ function getPage(url, req, response, options, global) {
   renderToStream(ret).pipe(response);
 }
 
+function my404(req, res, options, global) {
+  let url = req.url;
+  console.error("bad url:", url);
+  res.writeHead(404, {'content-type': 'text/html'});
+  getPage('404.html', req, res, options, global);
+};
+
 function startServer(options) {
   let app = express();
   app.use(serveStatic(Path.join(options.input, 'src/static')))
@@ -214,7 +222,10 @@ function startServer(options) {
     //res.send('Hello World');
     getPage('index.html', req, res, options, options.global);
   })
-  // TODO 404
+  app.use((req, res) => {
+    my404(req, res, options, options.global);
+  });
+
   const port = options.port || DEFAULT_PORT;
   console.log('Listening on localhost:' + port);
   app.listen(port);
