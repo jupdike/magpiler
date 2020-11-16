@@ -8,6 +8,7 @@ const fs = require('fs');
 
 const { renderToString, renderToStream } = require('@popeindustries/lit-html-server');
 const express = require('express');
+const serveStatic = require('serve-static')
 
 const DEFAULT_PORT = 8123;
 
@@ -206,14 +207,14 @@ function getPage(url, req, response, options, global) {
   renderToStream(ret).pipe(response);
 }
 
-// TODO deal with /static/
-
 function startServer(options) {
   let app = express();
+  app.use(serveStatic(Path.join(options.input, 'src/static')))
   app.get('/', function (req, res) {
     //res.send('Hello World');
     getPage('index.html', req, res, options, options.global);
   })
+  // TODO 404
   const port = options.port || DEFAULT_PORT;
   console.log('Listening on localhost:' + port);
   app.listen(port);
