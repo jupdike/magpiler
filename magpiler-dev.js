@@ -155,6 +155,8 @@ function realMain(options) {
   }
   options.src = Path.join(options.input, "src");
   options.out = Path.join(options.input, "out");
+
+  // first pass, read through files and process metadata (YAML) and Markdown
   fs.readdirSync(options.src).forEach(folder => {
     if ('render layouts static'.split(' ').includes(folder)) {
       options[folder] = getFileNames(Path.join(options.src, folder), folder != 'static');
@@ -177,19 +179,27 @@ function realMain(options) {
     options.renderDict[o.file] = o;
   });
 
-  //console.log("OPTIONS\n---\n", options);
-  options.global = { footerHTML: "<p>Test Footer text</p>" }; // TODO get this from src/ folder or its parent
+  // these get merged into one object
+  // separate files allow a smaller config.js to be left out of the repo and copied from a source-controlled file. global.js could contain code/helper methods
+  options.global = eval(fs.readFileSync(Path.join(options.src, "global.js"))+"");
+  let config = eval(fs.readFileSync(Path.join(options.src, "config.js"))+"");
+  for (var key in config) {
+    if (!config.hasOwnProperty(key)) {
+      continue;
+    }
+    options.global[key] = config[key];
+  }
+
+  console.log(options.global);
 
   startServer(options);
 }
 
-function getPage(url, req, response, options, global) {
+function getPage(url, req, response, options) {
   if (url.startsWith('/')) {
     url = url.slice(1);
   }
   let def = options.layoutsDict['default'];
-  // TODO use default layout AFTER first layout
-
   //console.log(context.file, layout);
   let context = options.renderDict[url];
   let layout = 'default';
@@ -198,21 +208,24 @@ function getPage(url, req, response, options, global) {
   }
   layout = options.layoutsDict[layout];
   
-  let ret = layout.templateFunc(context, global);
+  let ret = layout.templateFunc(context, options.global);
   // renderToString(ret).then(result => {
   //   // console.log('---');
   //   // console.log(context.file);
   //   // //console.log(c.body);
   //   // console.log(result);
   // });
+
+  // TODO use default layout AFTER first layout
+
   renderToStream(ret).pipe(response);
 }
 
-function my404(req, res, options, global) {
+function my404(req, res, options) {
   let url = req.url;
   console.error("bad url:", url);
   res.writeHead(404, {'content-type': 'text/html'});
-  getPage('404.html', req, res, options, global);
+  getPage('404.html', req, res, options);
 };
 
 function startServer(options) {
@@ -220,10 +233,10 @@ function startServer(options) {
   app.use(serveStatic(Path.join(options.input, 'src/static')))
   app.get('/', function (req, res) {
     //res.send('Hello World');
-    getPage('index.html', req, res, options, options.global);
+    getPage('index.html', req, res, options);
   })
   app.use((req, res) => {
-    my404(req, res, options, options.global);
+    my404(req, res, options);
   });
 
   const port = options.port || DEFAULT_PORT;
