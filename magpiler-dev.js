@@ -10,13 +10,7 @@ const { html } = require('@popeindustries/lit-html-server');
 const { unsafeHTML } = require('@popeindustries/lit-html-server/directives/unsafe-html.js');
 const { renderToString, renderToStream } = require('@popeindustries/lit-html-server');
 const isString = (str) => str instanceof String || typeof str === "string";
-const noEscape = (x) => {
-  if (isString(x)) {
-    return unsafeHTML(x);
-  } else {
-    return x;
-  }
-};
+const noEscape = (x) => isString(x) ? unsafeHTML(x) : x;
 
 const express = require('express');
 const serveStatic = require('serve-static')
