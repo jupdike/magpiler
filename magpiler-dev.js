@@ -6,7 +6,18 @@ const path = require('path');
 const Path = path;
 const fs = require('fs');
 
+const { html } = require('@popeindustries/lit-html-server');
+const { unsafeHTML } = require('@popeindustries/lit-html-server/directives/unsafe-html.js');
 const { renderToString, renderToStream } = require('@popeindustries/lit-html-server');
+const isString = (str) => str instanceof String || typeof str === "string";
+const noEscape = (x) => {
+  if (isString(x)) {
+    return unsafeHTML(x);
+  } else {
+    return x;
+  }
+};
+
 const express = require('express');
 const serveStatic = require('serve-static')
 
@@ -71,18 +82,18 @@ const getFilesRecursively = (path) => {
 };
 
 function processMeta(ob) {
-  //console.log('file:', ob.file);
+  console.log('file:', ob.file);
   lines = ob.contents.split('\n');
   ob.meta = {}
   if (lines.length < 1) {
     return;
   }
-  if (lines[0] == "---") {
+  if (lines[0] === "---" || lines[0] === '/*---') {
     let pairs = {}
     let sepCount = 0;
     let cleanLines = [];
     lines.forEach(line => {
-      if (line === '---') {
+      if (line === '---' || line === '/*---' || line === '---*/') {
         sepCount++;
         return;
       }
@@ -95,6 +106,9 @@ function processMeta(ob) {
           let rhs = line.slice(ix +1).trim();
           rhs = JSON.parse(rhs);
           ob[key] = rhs;
+          if (key === "date") {
+            ob[key] = new Date(rhs);
+          }
         }
       }
     });
@@ -181,43 +195,56 @@ function realMain(options) {
 
   // these get merged into one object
   // separate files allow a smaller config.js to be left out of the repo and copied from a source-controlled file. global.js could contain code/helper methods
-  options.global = eval(fs.readFileSync(Path.join(options.src, "global.js"))+"");
-  let config = eval(fs.readFileSync(Path.join(options.src, "config.js"))+"");
+  options.global = eval(fs.readFileSync(Path.join(options.src, "global.js"))+"")(options);
+  let config = eval(fs.readFileSync(Path.join(options.src, "config.js"))+"")(options);
   for (var key in config) {
     if (!config.hasOwnProperty(key)) {
       continue;
     }
     options.global[key] = config[key];
   }
+  //console.log(options.global);
 
-  console.log(options.global);
+  // // proof of concept.
+  // // unsafeHTML does not work when the argument is a TemplateResult, but noEscape does!
+  // let ret1 = (x => html`<a>got ${x.body} it</a>`)({body: "1"});
+  // let ret2 = (x => html`outer ${noEscape(x.body)} outer`)({body: ret1});
+  // renderToString(ret2).then(result => {
+  //   console.log('---');
+  //   console.log(result);
+  // });
 
   startServer(options);
 }
+
+// renderToString(ret).then(result => {
+//   // console.log('---');
+//   // console.log(context.file);
+//   // //console.log(c.body);
+//   // console.log(result);
+// });
 
 function getPage(url, req, response, options) {
   if (url.startsWith('/')) {
     url = url.slice(1);
   }
   let def = options.layoutsDict['default'];
-  //console.log(context.file, layout);
   let context = options.renderDict[url];
-  let layout = 'default';
+  let layoutName = 'default';
+  let ob = context;
   if (context && context.layout) {
-    layout = context.layout;
+    layoutName = context.layout;
   }
-  layout = options.layoutsDict[layout];
-  
-  let ret = layout.templateFunc(context, options.global);
-  // renderToString(ret).then(result => {
-  //   // console.log('---');
-  //   // console.log(context.file);
-  //   // //console.log(c.body);
-  //   // console.log(result);
-  // });
-
-  // TODO use default layout AFTER first layout
-
+  let ret;
+  do {
+    layout = options.layoutsDict[layoutName];
+    ret = layout.templateFunc(ob, options.global);
+    console.log("GETPAGE:", url, "layoutName:", layoutName);
+    layoutName = layout.layout;
+    console.log("layoutName of layout:", layoutName);
+    ob = { 'body': ret }; // TODO this could copy old 'ob' field by field, then set 'body' here
+    //console.log('ob:', ob);
+  } while (layoutName); // if not undefined, try again
   renderToStream(ret).pipe(response);
 }
 
@@ -231,10 +258,18 @@ function my404(req, res, options) {
 function startServer(options) {
   let app = express();
   app.use(serveStatic(Path.join(options.input, 'src/static')))
-  app.get('/', function (req, res) {
+  app.get('/', (req, res) => {
     //res.send('Hello World');
     getPage('index.html', req, res, options);
   })
+  // get any page from src/render
+  options.render.forEach(ob => {
+    //console.log('ADDING ROUTE FOR ' + ob.file);
+    app.get('/' + ob.file, (req, res) => {
+      getPage(ob.file, req, res, options);
+    });
+  });
+  // needs to be last!
   app.use((req, res) => {
     my404(req, res, options);
   });
