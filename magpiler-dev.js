@@ -218,6 +218,24 @@ function realMain(options) {
 //   // console.log(result);
 // });
 
+// copy k/vs in a into a new object, then copy k/vs from b into this new obj
+function copiedAndMerged(a, b) {
+  let ret = {};
+  for (var key in a) {
+    if (!a.hasOwnProperty(key)) {
+      continue;
+    }
+    ret[key] = a[key];
+  }
+  for (var key in b) {
+    if (!b.hasOwnProperty(key)) {
+      continue;
+    }
+    ret[key] = b[key];
+  }
+  return ret;
+}
+
 function getPage(url, req, response, options) {
   if (url.startsWith('/')) {
     url = url.slice(1);
@@ -229,10 +247,11 @@ function getPage(url, req, response, options) {
   if (context && context.layout) {
     layoutName = context.layout;
   }
+  let globalCopy = copiedAndMerged(options.global, {documentUrl: url});
   let ret;
   do {
     layout = options.layoutsDict[layoutName];
-    ret = layout.templateFunc(ob, options.global);
+    ret = layout.templateFunc(ob, globalCopy);
     console.log("GETPAGE:", url, "layoutName:", layoutName);
     layoutName = layout.layout;
     console.log("layoutName of layout:", layoutName);
