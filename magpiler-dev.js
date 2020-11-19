@@ -197,6 +197,10 @@ function realMain(options) {
     }
     options.global[key] = config[key];
   }
+  options.global['renderLayout'] = (a, b) => {
+    console.log("global.renderLayout called with", a);
+    return renderLayoutInner(options, a, b);
+  };
   //console.log(options.global);
 
   // // proof of concept.
@@ -236,6 +240,39 @@ function copiedAndMerged(a, b) {
   return ret;
 }
 
+function keysOf(ob) {
+  let ret = [];
+  for (let k in ob) {
+    if (!ob.hasOwnProperty(k)) {
+      continue;
+    }
+    ret.push(k);
+  }
+  return ret;
+}
+
+function renderLayoutInner(options, layoutName, context) {
+  let ob = context;
+  let globalCopy = copiedAndMerged(options.global, {documentUrl: context.file});
+  let ret;
+  do {
+    console.log('r l i DO -----------');
+    //console.log('layoutsDict keys:', keysOf(options.layoutsDict))
+    layout = options.layoutsDict[layoutName];
+    //console.log('layout:', layout);
+    console.log("layoutName:", layoutName, '-- layout.layout:', layout.layout);
+    layoutName = layout.layout;
+    console.log("RECURSIVE CALL here, possibly");
+    ret = layout.templateFunc(ob, globalCopy);
+    //console.log("renderLayout:", context.file, "layoutName:", layoutName);
+    console.log("layoutName of layout:", layoutName);
+    ob = { 'body': ret }; // TODO this could copy old 'ob' field by field, then set 'body' here
+    //console.log('ob:', ob);
+  } while (layoutName); // if not undefined, try again
+  console.log("END r l i ---------");
+  return ret;
+}
+
 function getPage(url, req, response, options) {
   if (url.startsWith('/')) {
     url = url.slice(1);
@@ -243,21 +280,11 @@ function getPage(url, req, response, options) {
   let def = options.layoutsDict['default'];
   let context = options.renderDict[url];
   let layoutName = 'default';
-  let ob = context;
   if (context && context.layout) {
     layoutName = context.layout;
   }
-  let globalCopy = copiedAndMerged(options.global, {documentUrl: url});
-  let ret;
-  do {
-    layout = options.layoutsDict[layoutName];
-    ret = layout.templateFunc(ob, globalCopy);
-    console.log("GETPAGE:", url, "layoutName:", layoutName);
-    layoutName = layout.layout;
-    console.log("layoutName of layout:", layoutName);
-    ob = { 'body': ret }; // TODO this could copy old 'ob' field by field, then set 'body' here
-    //console.log('ob:', ob);
-  } while (layoutName); // if not undefined, try again
+  console.log("getPage:", url);
+  let ret = renderLayoutInner(options, layoutName, context);
   renderToStream(ret).pipe(response);
 }
 
