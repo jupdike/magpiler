@@ -20,6 +20,7 @@ const DEFAULT_PORT = 8123;
 const optionDefinitions = [
   { name: 'port', alias: 'p', type: Number, description: "port on which server will listen (default "+DEFAULT_PORT+")"},
   { name: 'input', alias: 'i', defaultOption: true, type: String, description: "input folder to process"},
+  { name: 'args', alias: 'a', type: String, description: "k1:v1,k2:v2 strings to add to options" },
   { name: 'help', alias: 'h', type: Boolean, description: "print this usage help and exit"}
 ];
 
@@ -35,6 +36,11 @@ const sections = [
         name: 'input',
         typeLabel: '{underline folder}',
         description: '(Default with no flags.) The input folder to process (e.g. {underline /path/to/src}).'
+      },
+      {
+        name: 'args',
+        typeLabel: '{underline k1:v1,k2:v2,...}',
+        description: "key value pairs to add to options object, available to config.js and global.js"
       },
       {
         name: 'port',
@@ -163,6 +169,16 @@ function realMain(options) {
   }
   options.src = Path.join(options.input, "src");
   options.out = Path.join(options.input, "out");
+
+  if (options.args) {
+    let pairs = options.args.split(',');
+    pairs.forEach(pair => {
+      let kv = pair.split(':');
+      if (kv.length >= 2) {
+        options[kv[0]] = kv[1];
+      }
+    });
+  }
 
   // first pass, read through files and process metadata (YAML) and Markdown
   fs.readdirSync(options.src).forEach(folder => {
