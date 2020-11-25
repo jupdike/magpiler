@@ -301,6 +301,13 @@ function getPage(url, req, response, options) {
   }
   console.log("getPage:", url);
   let ret = renderLayoutInner(options, layoutName, context);
+  if (isString(ret)) {
+    if (url.endsWith(".xml")) {
+      response.type("text/xml");
+    }
+    response.send(ret)
+    return;
+  }
   renderToStream(ret).pipe(response);
 }
 
