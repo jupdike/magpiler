@@ -64,3 +64,7 @@ Layout templates can be called with ``global.renderLayout('layoutName', dataObje
 ### `src/static/`
 
 All static files are copied to `out/` (or served up from the server root as static files or routes with a prefixed folder).
+
+## Inspiration
+
+Magpiler is based on the limited features I used when I first built my blog with [DocPad](https://github.com/docpad/docpad), which is now unsupported and also just stopped working one day.
