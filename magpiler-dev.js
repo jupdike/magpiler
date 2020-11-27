@@ -1,7 +1,7 @@
 const commandLineArgs = require('command-line-args');
 const getUsage = require('command-line-usage');
 
-const { serverMain, DEFAULT_PORT } = require('./magpiler-core');
+const { loadData, parseOptions, startServer, DEFAULT_PORT } = require('./magpiler-core');
 
 const optionDefinitions = [
   { name: 'port', alias: 'p', type: Number, description: "port on which server will listen (default "+DEFAULT_PORT+")"},
@@ -41,6 +41,15 @@ const sections = [
   }
 ];
 
+function serverMain(sections, options) {
+  options = parseOptions(sections, options);
+  if (!options) {
+    return;
+  }
+  loadData(options);
+  startServer(options);
+}
+
 function main(options) {
   if (options) {
     serverMain(options);
@@ -50,7 +59,7 @@ function main(options) {
     return;
   }
   options = commandLineArgs(optionDefinitions);
-  serverMain(options);
+  serverMain(sections, options);
 }
 
 main();

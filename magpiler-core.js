@@ -1,3 +1,5 @@
+const getUsage = require('command-line-usage');
+
 const md = require('markdown-it')({html: true});
 
 const path = require('path');
@@ -106,7 +108,19 @@ function getFileNames(folder, shouldGetContents) {
   return ret;
 }
 
-function serverMain(options) {
+function expandArgs(options) {
+  if (options.args) {
+    let pairs = options.args.split(',');
+    pairs.forEach(pair => {
+      let kv = pair.split(':');
+      if (kv.length >= 2) {
+        options[kv[0]] = kv[1];
+      }
+    });
+  }
+}
+
+function parseOptions(sections, options) {
   if (options.help) {
     console.log(getUsage(sections));
     return;
@@ -118,16 +132,12 @@ function serverMain(options) {
   options.src = Path.join(options.input, "src");
   options.out = Path.join(options.input, "out");
 
-  if (options.args) {
-    let pairs = options.args.split(',');
-    pairs.forEach(pair => {
-      let kv = pair.split(':');
-      if (kv.length >= 2) {
-        options[kv[0]] = kv[1];
-      }
-    });
-  }
+  expandArgs(options);
 
+  return options;
+}
+
+function loadData(options) {
   // first pass, read through files and process metadata (YAML) and Markdown
   fs.readdirSync(options.src).forEach(folder => {
     if ('render layouts static'.split(' ').includes(folder)) {
@@ -162,7 +172,7 @@ function serverMain(options) {
     options.global[key] = config[key];
   }
   options.global['renderLayout'] = (a, b) => {
-    console.log("global.renderLayout called with", a);
+    //console.log("global.renderLayout called with", a);
     return renderLayoutInner(options, a, b);
   };
   //console.log(options.global);
@@ -175,16 +185,7 @@ function serverMain(options) {
   //   console.log('---');
   //   console.log(result);
   // });
-
-  startServer(options);
 }
-
-// renderToString(ret).then(result => {
-//   // console.log('---');
-//   // console.log(context.file);
-//   // //console.log(c.body);
-//   // console.log(result);
-// });
 
 // copy k/vs in a into a new object, then copy k/vs from b into this new obj
 function copiedAndMerged(a, b) {
@@ -220,20 +221,20 @@ function renderLayoutInner(options, layoutName, context) {
   let globalCopy = copiedAndMerged(options.global, {documentUrl: context.file});
   let ret;
   do {
-    console.log('r l i DO -----------');
-    //console.log('layoutsDict keys:', keysOf(options.layoutsDict))
+    //console.log('r l i DO -----------');
+    ////console.log('layoutsDict keys:', keysOf(options.layoutsDict))
     layout = options.layoutsDict[layoutName];
-    //console.log('layout:', layout);
-    console.log("layoutName:", layoutName, '-- layout.layout:', layout.layout);
+    ////console.log('layout:', layout);
+    //console.log("layoutName:", layoutName, '-- layout.layout:', layout.layout);
     layoutName = layout.layout;
-    console.log("RECURSIVE CALL here, possibly");
+    //console.log("RECURSIVE CALL here, possibly");
     ret = layout.templateFunc(ob, globalCopy);
-    //console.log("renderLayout:", context.file, "layoutName:", layoutName);
-    console.log("layoutName of layout:", layoutName);
+    ////console.log("renderLayout:", context.file, "layoutName:", layoutName);
+    //console.log("layoutName of layout:", layoutName);
     ob = { 'body': ret }; // TODO this could copy old 'ob' field by field, then set 'body' here
     //console.log('ob:', ob);
   } while (layoutName); // if not undefined, try again
-  console.log("END r l i ---------");
+  //console.log("END r l i ---------");
   return ret;
 }
 
@@ -257,6 +258,36 @@ function getPage(url, req, response, options) {
     return;
   }
   renderToStream(ret).pipe(response);
+}
+
+function renderPage(url, outPath, options) {
+  if (url.startsWith('/')) {
+    url = url.slice(1);
+  }
+  let def = options.layoutsDict['default'];
+  let context = options.renderDict[url];
+  let layoutName = 'default';
+  if (context && context.layout) {
+    layoutName = context.layout;
+  }
+  //console.log("renderPage:", url);
+  let ret = renderLayoutInner(options, layoutName, context);
+  if (isString(ret)) { // can use simple strings, for example for XML (e.g. rss.xml)
+    fs.writeFile(outPath, ret, (err) => {
+      if (err) throw err;
+      //console.log('wrote out', ret.length, 'bytes to', outPath);
+    });
+    return;
+  }
+  //console.log('want to renderToString');
+  renderToString(ret).then(data => {
+    fs.writeFile(outPath, data, (err) => {
+      if (err) throw err;
+      //console.log('wrote out', data.length, 'bytes to', outPath);
+    });
+  }, err => {
+    console.log("an error occurred in renderPage at renderToString:", url, "---\n", err);
+  });
 }
 
 function my404(req, res, options) {
@@ -290,4 +321,11 @@ function startServer(options) {
   app.listen(port);
 }
 
-module.exports = { serverMain: serverMain, DEFAULT_PORT: DEFAULT_PORT };
+module.exports = {
+  startServer: startServer,
+  parseOptions: parseOptions,
+  loadData: loadData,
+  renderPage: renderPage,
+  getFilesRecursively: getFilesRecursively,
+  DEFAULT_PORT: DEFAULT_PORT
+};
