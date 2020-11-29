@@ -1,0 +1,29 @@
+{
+  "name": "magpiler",
+  "version": "0.1.0",
+  "description": "Make a small, simple website or blog from a folder full of Markdown and JS template files (lit-html). Generate a static website.",
+  "main": "magpiler-dev.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jupdike/magpiler.git"
+  },
+  "keywords": [
+    "ssg"
+  ],
+  "author": "Jared Updike",
+  "license": "BSD-2-Clause",
+  "bugs": {
+    "url": "https://github.com/jupdike/magpiler/issues"
+  },
+  "homepage": "https://github.com/jupdike/magpiler#readme",
+  "dependencies": {
+    "@popeindustries/lit-html-server": "^3.1.0",
+    "command-line-args": "^5.1.1",
+    "command-line-usage": "^6.1.1",
+    "express": "^4.17.1",
+    "markdown-it": "^12.0.2"
+  }
+}
