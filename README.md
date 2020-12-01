@@ -4,7 +4,11 @@
 
 ## Make a small, simple website or blog
 
-Make a simple website from a folder full of Markdown and JS template files (`lit-html-server`, pure-Javascript templates, similar to `lit-html`).
+Make a simple website from a folder full of Markdown and JavaScript [`lit-server-html`](https://github.com/popeindustries/lit-html-server) template files, which are framework-free, pure-Javascript templates, similar to `lit-html`).
+
+## `mp-init`: a simple sample Magpiler project
+
+For a sample website project folder, try [`mp-init`](https://github.com/jupdike/mp-init), to get yourself off the ground with a simple, single-page website.
 
 ## `magpiler-dev.js`
 
