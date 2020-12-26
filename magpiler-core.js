@@ -1,6 +1,6 @@
 const getUsage = require('command-line-usage');
 
-const md = require('markdown-it')({html: true});
+const md = require('markdown-it')({html: true}).use(require('markdown-it-footnote'));
 
 const path = require('path');
 const Path = path;
